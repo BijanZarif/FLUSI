@@ -1,0 +1,20 @@
+diff -r p3dfft-dist.2.6.1/build/setup.F90 p3dfft-dist.2.6.1-turing/build/setup.F90
+37c37
+<       integer(i8) nm,n1,n2,pad1
+---
+>       integer(i8) nm,n1,n2,pad1,pad1_bis
+508c508,509
+<       if(mod(pad1,nx*jisize) .ne. 0) then
+---
+>       pad1_bis=nx*jisize
+>       if(mod(pad1,pad1_bis) .ne. 0) then
+diff -r p3dfft-dist.2.6.1/configure p3dfft-dist.2.6.1-turing/configure
+2899a2900,2902
+> #IDRIS
+>         FORTRAN_LIB="-L/opt/ibmcmp/xlf/bg/14.1/bglib64 -lxlf90_r"
+> #IDRIS
+diff -r p3dfft-dist.2.6.1/include/p3dfft.h p3dfft-dist.2.6.1-turing/include/p3dfft.h
+29c29
+< elif defined INTEL
+---
+> #elif defined INTEL
