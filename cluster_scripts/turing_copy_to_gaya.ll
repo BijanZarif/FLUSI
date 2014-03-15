@@ -94,6 +94,10 @@ case $LOADL_STEP_NAME in
   #======= Sequential postprocessing =======
     sequential_postprocessing )
 	set -x
+        cd $tmpdir
+        echo "files in tmpdir"
+        ls -l
+
 	for file in *
 	do 
 	  mfput ${file} ${dir_gaya}/${file}
