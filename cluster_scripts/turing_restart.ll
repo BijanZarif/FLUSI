@@ -38,9 +38,8 @@
 
 PARAMSFILE=Testing_Sphere.ini
 PROGFILE=flusi
-RUNTIMEFILE=runtime_backup0.h5
 # INPUT FILES FOR THE SIMULATION
-files_input=($PARAMSFILE $PROGFILE $RUNTIMEFILE)
+files_input=($PARAMSFILE $PROGFILE)
 # when retaking a backup, the *.t files as well as runtime_backupX.h5
 # must be copied
 
@@ -66,9 +65,8 @@ case $LOADL_STEP_NAME in
 	# copy all input files to the work directory
         for file in "${files_input[@]}"
         do
-          cp $LOADL_STEP_INITDIR/$file $tmpdir
+          cp $LOADL_STEP_INITDIR/$file $tmpdir  
         done
-        cp $LOADL_STEP_INITDIR/*.t $tmpdir
 
 	ln -s $tmpdir workdir
 	
