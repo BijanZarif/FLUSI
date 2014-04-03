@@ -18,4 +18,11 @@ fi
 
 echo $srcdir
 
-ionice -c 3 nice -n 19 rsync -avpu --exclude 'core*' --exclude '*.h5' --exclude '*.xmf'  turing:${srcdir} ./
+ionice -c 3 nice -n 19 rsync -avpun --exclude 'core*' --exclude '*.h5' --exclude '*.xmf'  turing:${srcdir} ./
+
+echo "pull files? Y/N"
+read text
+
+if [ "$text" == "Y" ] ; then
+    ionice -c 3 nice -n 19 rsync -avpu --exclude 'core*' --exclude '*.h5' --exclude '*.xmf'  turing:${srcdir} ./
+fi

@@ -6,16 +6,24 @@
 # usage: ./pullwork.sh <run directory on turing>
 
 # example: 
-# ./pullwork.sh /linkhome/rech/sch/rsch511/flusi/smc/bc256/qay1/70.6/workdir/
+# ./pullwork.sh turing:/linkhome/rech/sch/rsch511/flusi/smc/bc256/qay1/70.6/workdir/
 # note that the work dir must have a trailing slash.
 
 if [ "$1" == "" ]; then
     srcdir=$(pwd | sed 's/^.*lidris//')
-    srcdir=/linkhome/rech/sch/rsch511/flusi${srcdir}/workdir/
+    srcdir=/linkhome/rech/sch/rsch511/flusi${srcdir}/
 else
     srdcir=$1
 fi    
 
 echo $srcdir
 
-ionice -c 3 nice -n 19 rsync -avpu --exclude 'core*' --exclude '*.h5' --exclude '*.xmf'  turing:${srcdir} ./
+ionice -c 3 nice -n 19 rsync -avpun --exclude 'core*' --exclude '*.h5' --exclude '*.xmf'  turing:${srcdir} ./
+
+echo "pull files? Y/N"
+
+read text
+
+if [ "$text" == "Y" ] ; then
+    ionice -c 3 nice -n 19 rsync -avpu --exclude 'core*' --exclude '*.h5' --exclude '*.xmf'  turing:${srcdir} ./
+fi

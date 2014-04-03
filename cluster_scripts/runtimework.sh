@@ -11,11 +11,18 @@
 
 if [ "$1" == "" ]; then
     srcdir=$(pwd | sed 's/^.*lidris//')
-    srcdir=/linkhome/rech/sch/rsch511/flusi${srcdir}/workdir/
+    srcdir=/linkhome/rech/sch/rsch511/flusi${srcdir}/
 else
     srdcir=$1
 fi
 
 echo $srcdir
 
-ionice -c 3 nice -n 19 rsync -avpu --exclude '*' --include 'runtime*.h5' turing:${srcdir} ./
+ionice -c 3 nice -n 19 rsync -avpun  --include 'runtime*.h5' --exclude '*' turing:${srcdir} ./
+
+echo "pull files? Y/N"
+read text
+
+if [ "$text" == "Y" ] ; then
+    ionice -c 3 nice -n 19 rsync -avpu  --include 'runtime*.h5' --exclude '*' turing:${srcdir} ./
+fi
