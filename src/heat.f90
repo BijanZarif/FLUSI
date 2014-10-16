@@ -30,7 +30,6 @@ subroutine heat(time,temp)
   norminfloc = 0.0d0
   norminfloc1 = 0.0d0
   norminfloc2 = 0.0d0 
-print *,'IN',mpirank
   ! Y DIRECTION
   ! Set up parameters in y direction
   mpicommdir = mpicommy
@@ -41,13 +40,10 @@ print *,'IN',mpirank
   gadir = ga(2)
   gbdir = gb(2)
   ! Synchronize ghost points
-print *,'BEFORE',mpirank
   call synchronize_ghosts_FD (temp(:,:,:,1))
-print *,'AFTER',mpirank
 
   ! Cases if # subdomains = 1 or >=2
   if (mpiszdir>1) then 
-print *,'MARK1',mpirank
     ! Parallel 1d solver init
     call heat_cn_1d_mpi_init (mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,gadir,gbdir,dt,&
                           bcmaty,cnmaty,vly,vry)
@@ -65,9 +61,7 @@ print *,'MARK1',mpirank
         temp(ix,radir:rbdir,iz,1) = utmpy(radir:rbdir)
       enddo 
     enddo
-print *,'MARK2',mpirank
   else
-print *,'POINT1',mpirank
     do iz=ga(3),gb(3)
       !zz = dble(iz)*dz
       do ix=ga(1),gb(1)
@@ -80,7 +74,6 @@ print *,'POINT1',mpirank
         temp(ix,radir:rbdir,iz,1) = utmpy(radir:rbdir)
       enddo
     enddo    
-print *,'POINT2',mpirank
   endif
 
   ! Z DIRECTION
@@ -96,7 +89,6 @@ print *,'POINT2',mpirank
   call synchronize_ghosts_FD (temp(:,:,:,1))
   ! Cases if # subdomains = 1 or >=2
   if (mpiszdir>1) then 
-print *,'MARK3',mpirank
     ! Parallel 1d solver init
     call heat_cn_1d_mpi_init (mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,gadir,gbdir,dt,&
                           bcmatz,cnmatz,vlz,vrz)
@@ -113,9 +105,7 @@ print *,'MARK3',mpirank
         temp(ix,radir:rbdir,iz,1) = utmpz(radir:rbdir)
       enddo 
     enddo
-print *,'MARK4',mpirank
   else
-print *,'POINT3',mpirank
     do iy=ga(2),gb(2)
       !yy = dble(iy)*dy
       do ix=ga(1),gb(1)
@@ -128,7 +118,6 @@ print *,'POINT3',mpirank
         temp(ix,radir:rbdir,iz,1) = utmpz(radir:rbdir)
       enddo
     enddo    
-print *,'POINT4',mpirank
   endif
 
   ! X DIRECTION
@@ -423,4 +412,23 @@ subroutine heat_cn_1d_serial_solver(h2inv,radir,rbdir,gadir,gbdir,dt,utmp)
   ! Solve local system
   call solve_loc1d (cnmat,rhs,utmp(radir:rbdir),rbdir-radir+1)
 end subroutine
+
+
+! LOD splitting. Initialization of the 1d implicit MPI solver
+!subroutine heat_cn_1d_mpi_init(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,gadir,gbdir,dt,&
+!                           bcmat,cnmat,vl,vr)
+!  use p3dfft_wrapper
+!  use basic_operators
+!  use vars
+!  implicit none
+  ! Input/output
+!  integer,intent(inout) :: mpicommdir,mpiszdir,mpirankdir,radir,rbdir,gadir,gbdir
+!  real(kind=pr),intent(inout) :: h2inv,dt
+!  real(kind=pr),intent(inout) :: cnmat(radir:rbdir,radir:rbdir),bcmat(2*mpiszdir,2*mpiszdir),&
+!                                 vl(radir:rbdir),vr(radir:rbdir)
+  ! Local variables
+!  integer :: nn,j,mpicode
+!  real(kind=pr) :: vl1(mpiszdir),vlN(mpiszdir),vr1(mpiszdir),vrN(mpiszdir)
+!  real(kind=pr) :: rhs(radir:rbdir),vf(radir:rbdir),bcxls(mpiszdir),&
+!                   bcxrs(mpiszdir),vf1(mpiszdir),vfN(mpiszdir)
 

@@ -239,7 +239,7 @@ subroutine Start_Simulation()
   ! Step forward in time
   !*****************************************************************************
   t1 = MPI_wtime()
-  call time_step(time,u,nlk,work,mask,mask_color,us,Insect,beams,infile)
+  call time_step(time,u,nlk,work,temp,mask,mask_color,us,Insect,beams,infile)
   t2 = MPI_wtime() - t1
   
   !-----------------------------------------------------------------------------
