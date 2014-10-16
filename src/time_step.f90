@@ -1,4 +1,4 @@
-subroutine time_step(time,u,nlk,work,mask,mask_color,us,Insect,beams,params_file)
+subroutine time_step(time,u,nlk,work,temp,mask,mask_color,us,Insect,beams,params_file)
   use vars
   use p3dfft_wrapper
   use solid_model
@@ -16,7 +16,9 @@ subroutine time_step(time,u,nlk,work,mask,mask_color,us,Insect,beams,params_file
   type(solid), dimension(1:nBeams),intent(inout) :: beams
   type(diptera), intent(inout) :: Insect
   character(len=strlen),intent(in)  :: params_file ! for runtime control  
-  
+
+  real(kind=pr),intent(inout)::temp(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3),1:2)  
+
   logical :: continue_timestepping
   integer :: inter
   integer :: nbackup=0  ! 0 - backup to file runtime_backup0,1 - to
@@ -32,7 +34,7 @@ subroutine time_step(time,u,nlk,work,mask,mask_color,us,Insect,beams,params_file
   ! After init, output integral quantities
   if (index(inicond,'backup::')==0) then
     if (root) write(*,*) "Initial output of integral quantities...."
-    call write_integrals(time,u,nlk,work,mask,mask_color,us,Insect,beams)
+!!!    call write_integrals(time,u,nlk,work,mask,mask_color,us,Insect,beams)
   endif
 
 
@@ -47,9 +49,25 @@ subroutine time_step(time,u,nlk,work,mask,mask_color,us,Insect,beams,params_file
      !-------------------------------------------------
      if(dry_run_without_fluid/="yes") then
        ! make a time step of the fluid
-       call fluidtimestep(time,u,nlk,work,mask,mask_color,us,Insect,beams)
+!!       call fluidtimestep(time,u,nlk,work,mask,mask_color,us,Insect,beams)
      endif
-     
+  
+     !-----------------------------------------------
+     ! heat equation step (experimental)
+     !-----------------------------------------------
+!!!!
+  time%dt_new = 1.d0/20.d0 !1.d-4;
+  time%dt_old = 1.d0/20.d0 !1.d-4;
+!!!! 
+     if(time%it==0) then
+       call heat_init(temp)
+     else
+       call heat(time,temp)
+     endif
+     if(time%time>=tmax) then
+       stop
+     endif  
+ 
      !-----------------------------------------------
      ! time step done: advance iteration + time
      !-----------------------------------------------
@@ -65,14 +83,14 @@ subroutine time_step(time,u,nlk,work,mask,mask_color,us,Insect,beams,params_file
      ! units or itdrag time steps
      !-------------------------------------------------
      if (modulo(time%time,tintegral)<=time%dt_new.or.modulo(time%it,itdrag)==0) then
-       call write_integrals(time,u,nlk,work,mask,mask_color,us,Insect,beams)
+!!!       call write_integrals(time,u,nlk,work,mask,mask_color,us,Insect,beams)
      endif
     
      !-------------------------------------------------
      ! Save solid model data, if using it
      !-------------------------------------------------
      if (use_solid_model=="yes" .and. mpirank==0 .and. modulo(time%it,itbeam)==0) then
-       call SaveBeamData( time%time, beams )
+!!!       call SaveBeamData( time%time, beams )
      endif
     
      !-------------------------------------------------
@@ -80,13 +98,13 @@ subroutine time_step(time,u,nlk,work,mask,mask_color,us,Insect,beams,params_file
      !-------------------------------------------------
      if (((modulo(time%time,tsave)<time%dt_new).and.(time%time>=tsave_first)).or.(time%time==tmax)) then
         call are_we_there_yet(time%it,time%it_start,time%time,t2,t1,time%dt_new)
-        call save_fields(time,u,nlk,work,mask,mask_color,us,Insect,beams)   
+!!!        call save_fields(time,u,nlk,work,mask,mask_color,us,Insect,beams)   
      endif
 
      ! Backup if that's specified in the PARAMS.ini file. We try to do 
      ! backups every "truntime" hours (precise to one time step)
      if(idobackup==1 .and. truntimenext<(MPI_wtime()-time_total)/3600.d0) then
-         call dump_runtime_backup(time,nbackup,u,Insect,beams)
+!!         call dump_runtime_backup(time,nbackup,u,Insect,beams)
          truntimenext = truntimenext+truntime
      endif
      

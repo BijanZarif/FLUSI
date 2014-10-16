@@ -132,6 +132,9 @@ subroutine fft_initialize
   !-- Initialize P3DFFT
   call p3dfft_setup(mpidims,nx,ny,nz,MPI_COMM_WORLD, overwrite=.false.)
 
+  !-- Get Cartesian topology info
+  call p3dfft_get_mpi_info(mpitaskid,mpitasks,mpicommcart)
+
   !-- Get local sizes
   call p3dfft_get_dims(ra,rb,rs,1)  ! real blocks
   call p3dfft_get_dims(ca,cb,cs,2)  ! complex blocks

@@ -72,6 +72,8 @@ subroutine Start_Simulation()
   real(kind=pr),dimension(:,:,:,:),allocatable :: us
   ! work arrays
   real(kind=pr),dimension(:,:,:,:),allocatable :: work
+  ! temperature array for heat equation (experimental)
+  real(kind=pr),dimension(:,:,:,:),allocatable :: temp
   ! the right hand side
   real(kind=pr),dimension(:,:,:,:,:),allocatable :: nlk
   ! this is the insect we're using (object oriented)
@@ -195,6 +197,10 @@ subroutine Start_Simulation()
   ! allocate one work array
   allocate(work(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3),1:nrw))
   memory = memory + dble(nrw)*mem_field
+  
+  ! allocate temperature array
+  allocate(temp(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3),1:2))
+  memory = memory + dble(2)*mem_field
 
   !-----------------------------------------------------------------------------
   ! show memory consumption for information
@@ -239,6 +245,7 @@ subroutine Start_Simulation()
   !-----------------------------------------------------------------------------
   ! Deallocate memory
   !-----------------------------------------------------------------------------
+  deallocate(temp)
   deallocate(work)
   deallocate(u,nlk)
   deallocate(us)

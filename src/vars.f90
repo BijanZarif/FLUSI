@@ -82,7 +82,7 @@ module vars
   character(len=strlen), save :: decomposition
   
   ! p3dfft only parameters (move to appropraite .f90 file?)
-  integer,save :: mpicommcart
+  integer,save :: mpicommcart,mpicommy,mpicommz,mpitaskid,mpitasks
   integer,dimension(2),save :: mpidims,mpicoords,mpicommslab
   ! only root rank has this true:
   logical, save :: root=.false.
