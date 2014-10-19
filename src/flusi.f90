@@ -137,7 +137,7 @@ subroutine Start_Simulation()
   !-----------------------------------------------------------------------------
   ! ghost points
   !-----------------------------------------------------------------------------
-  ng=3 ! zero ghost points  
+  ng=1 ! zero ghost points  
   if (root) write(*,'("Set up ng=",i1," ghost points")') ng
   
   !-----------------------------------------------------------------------------
@@ -232,7 +232,7 @@ subroutine Start_Simulation()
   !-----------------------------------------------------------------------------
   ! Initial condition
   !-----------------------------------------------------------------------------
-  call init_fields(time,u,nlk,work,mask,mask_color,us,Insect,beams)
+  !call init_fields(time,u,nlk,work,mask,mask_color,us,Insect,beams)
   
   
   !*****************************************************************************

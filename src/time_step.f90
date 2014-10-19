@@ -151,10 +151,10 @@ subroutine time_step(time,u,nlk,work,temp,mask,mask_color,us,Insect,beams,params
   !-----------------------------------------------------------------------------
   ! save final backup so we can resume where we left 
   !-----------------------------------------------------------------------------
-  if(idobackup==1) then
-    if(root) write (*,*) "final backup..."
-    call dump_runtime_backup(time,nbackup,u,Insect,beams)
-  endif
+!  if(idobackup==1) then
+!    if(root) write (*,*) "final backup..."
+!    call dump_runtime_backup(time,nbackup,u,Insect,beams)
+!  endif
 
   if(root) write(*,'("Done time stepping; did nt=",i5," steps")') time%it-time%it_start
 end subroutine time_step
