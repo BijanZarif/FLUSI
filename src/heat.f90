@@ -285,7 +285,7 @@ subroutine heat_cn_1d_mpi_init(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,
                                  vl(radir:rbdir),vr(radir:rbdir)
   ! Local variables
   integer :: nn,j,mpicode
-  real(kind=pr) :: foo
+  real(kind=pr) :: sendfoo(4),recvfoo(4*mpiszdir)
   real(kind=pr) :: vl1(mpiszdir),vlN(mpiszdir),vr1(mpiszdir),vrN(mpiszdir)
   real(kind=pr) :: rhs(radir:rbdir)
   ! Get local ranks in the line
@@ -313,14 +313,17 @@ subroutine heat_cn_1d_mpi_init(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,
   ! BC influence matrix
   ! It is only stored by one process
   ! Communicate values at the interface to rank 0
-  foo = vl(radir)
-  call MPI_GATHER (foo,1,MPI_DOUBLE_PRECISION,vl1,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
-  foo = vl(rbdir)
-  call MPI_GATHER (foo,1,MPI_DOUBLE_PRECISION,vlN,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
-  foo = vr(radir)
-  call MPI_GATHER (foo,1,MPI_DOUBLE_PRECISION,vr1,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
-  foo = vr(rbdir)
-  call MPI_GATHER (foo,1,MPI_DOUBLE_PRECISION,vrN,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
+  sendfoo(1) = vl(radir)
+  sendfoo(2) = vl(rbdir)
+  sendfoo(3) = vr(radir)
+  sendfoo(4) = vr(rbdir)
+  call MPI_GATHER (sendfoo,4,MPI_DOUBLE_PRECISION,recvfoo,4,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
+  do j = 1,mpiszdir
+    vl1(j) = recvfoo(4*j-3)
+    vlN(j) = recvfoo(4*j-2)
+    vr1(j) = recvfoo(4*j-1)
+    vrN(j) = recvfoo(4*j)
+  enddo
   ! BC influence matrix is only stored by one process
   if (mpirankdir == 0) then
     bcmat(:,:) = 0.d0
@@ -350,7 +353,7 @@ subroutine heat_cn_1d_mpi_solver(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdi
                                  vl(radir:rbdir),vr(radir:rbdir),utmp(gadir:gbdir)
   ! local variables
   integer :: j,mpicode
-  real(kind=pr) :: bcxl,bcxr,foo
+  real(kind=pr) :: bcxl,bcxr,shortfoo(2*mpiszdir),longfoo(4*mpiszdir)
   real(kind=pr) :: bcrhs(2*mpiszdir),bcx(2*mpiszdir),&
                    rhs(radir:rbdir),vf(radir:rbdir),bcxls(mpiszdir),&
                    bcxrs(mpiszdir),vf1(mpiszdir),vfN(mpiszdir)
@@ -360,10 +363,13 @@ subroutine heat_cn_1d_mpi_solver(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdi
   ! Solve local system
   call solve_loc1d (cnmat,rhs,vf,rbdir-radir+1)
   ! Communicate rhs to rank 0 in the line
-  foo = vf(radir)
-  call MPI_GATHER (foo,1,MPI_DOUBLE_PRECISION,vf1,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
-  foo = vf(rbdir)
-  call MPI_GATHER (foo,1,MPI_DOUBLE_PRECISION,vfN,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
+  shortfoo(1) = vf(radir)
+  shortfoo(2) = vf(rbdir)
+  call MPI_GATHER (shortfoo,2,MPI_DOUBLE_PRECISION,longfoo,2,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
+  do j = 1,mpiszdir
+    vf1(j) = longfoo(2*j-1)
+    vfN(j) = longfoo(2*j)
+  enddo
   ! BC influence RHS
   if (mpirankdir == 0) then
     do j = 1,mpiszdir
@@ -379,8 +385,13 @@ subroutine heat_cn_1d_mpi_solver(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdi
     enddo
   endif
   ! Scatter from rank 0 in the line to all ranks
-  call MPI_SCATTER (bcxls,1,MPI_DOUBLE_PRECISION,bcxl,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
-  call MPI_SCATTER (bcxrs,1,MPI_DOUBLE_PRECISION,bcxr,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
+  do j = 1,mpiszdir
+    longfoo(2*j-1) = bcxls(j)
+    longfoo(2*j) = bcxrs(j)
+  enddo
+  call MPI_SCATTER (longfoo,2,MPI_DOUBLE_PRECISION,shortfoo,2,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
+  bcxl = shortfoo(1)
+  bcxr = shortfoo(2)
   ! Superpose local solution and BC influence
   utmp(radir:rbdir) = vf(:)-bcxl*vl(:)-bcxr*vr(:)
 end subroutine heat_cn_1d_mpi_solver
