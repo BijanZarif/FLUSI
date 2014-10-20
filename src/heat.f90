@@ -36,42 +36,11 @@ subroutine heat(time,temp)
   rbdir = rb(2)
   gadir = ga(2)
   gbdir = gb(2)
-  ! Synchronize ghost points
-!!!!!!!!!!!!!!!!!!!!!
-!call MPI_BARRIER(MPI_COMM_WORLD,mpicode)
-!print *,'MARK1',mpirank,maxval(abs(temp(:,:,:,1)))
-!!!!!!!!!!!!!!!!!!!!!
-!  call synchronize_ghosts_FD (temp)
-  call synchronize_ghosts_FD_x_heat (temp(:,:,:,1))
-  if (mpidims(2)>1) then
-    call synchronize_ghosts_FD_y_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_y_serial_heat (temp(:,:,:,1))
-  endif
-  if (mpidims(1)>1) then
-    call synchronize_ghosts_FD_z_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_z_serial_heat (temp(:,:,:,1))
-  endif
-!!!!!!!!!!!!!!!!!!!!!
-!call MPI_BARRIER(MPI_COMM_WORLD,mpicode)
-!print *,'MARK2',mpirank,maxval(abs(temp(:,:,:,1)))
-!!!!!!!!!!!!!!!!!!!!!
   ! Cases if # subdomains = 1 or >=2
   if (mpiszdir>1) then 
     ! Parallel 1d solver init
     call heat_cn_1d_mpi_init (mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,dt,&
                               bcmaty,cnmaty,vly,vry)
-!if (mpirank==0) then
-!do ix=1,2*mpiszdir
-!print *, 'bcmat=', bcmaty(ix,:)
-!enddo
-!print *, 'vly',vly(:)
-!print *, 'vry',vry(:)
-!endif
-!do ix=1,2*mpiszdir
-!print *,'rk=',mpirank,mpirankdir,'bcmat=',bcmaty(:,ix)
-!enddo
     ! Loop for all lines y=const
     do iz = ga(3),gb(3)
       !zz = dble(iz)*dz
@@ -86,6 +55,8 @@ subroutine heat(time,temp)
         temp(ix,radir:rbdir,iz,1) = utmpy(radir:rbdir)
       enddo 
     enddo
+    ! Synchronize ghost points
+    call synchronize_ghosts_FD_y_mpi_heat (temp(:,:,:,1))
   else
     do iz=ga(3),gb(3)
       !zz = dble(iz)*dz
@@ -99,36 +70,9 @@ subroutine heat(time,temp)
         temp(ix,radir:rbdir,iz,1) = utmpy(radir:rbdir)
       enddo
     enddo    
+    ! Synchronize ghost points
+    call synchronize_ghosts_FD_y_serial_heat (temp(:,:,:,1))
   endif
-
-
-
-  norminfloc = 0.0d0
-  norminfloc1 = 0.0d0
-  norminfloc2 = 0.0d0
-  do iz=ra(3),rb(3)
-    zz = dble(iz)*dz
-    do iy=ra(2),rb(2)
-      yy = dble(iy)*dy
-      do ix=ra(1),rb(1)
-        xx = dble(ix)*dx 
-
-        temp(ix,iy,iz,2) = dexp(-2*pi**2*nu*time%time)*(dexp(-15*pi**2*nu*time%time)*dcos(4*pi*yy)+dcos(pi*yy))*dcos(pi*zz)
-
-        norminfloc = max(norminfloc,abs(temp(ix,iy,iz,1)-temp(ix,iy,iz,2)))
-        norminfloc1 = max(norminfloc1,abs(temp(ix,iy,iz,1)))
-        norminfloc2 = max(norminfloc2,abs(temp(ix,iy,iz,2)))
-      enddo
-    enddo
-  enddo    
-  call MPI_ALLREDUCE (norminfloc,norminf,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,mpicode) 
-  call MPI_ALLREDUCE (norminfloc1,norminf1,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,mpicode) 
-  call MPI_ALLREDUCE (norminfloc2,norminf2,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,mpicode) 
-
-!if (mpirank==0) then
-! print *, 'norminf1=',norminf1
-!endif
-
 
   ! Z DIRECTION
   ! Set up parameters in z direction
@@ -139,27 +83,6 @@ subroutine heat(time,temp)
   rbdir = rb(3)
   gadir = ga(3)
   gbdir = gb(3)
-  ! Synchronize ghost points
-!!!!!!!!!!!!!!!!!!!!!
-!call MPI_BARRIER(MPI_COMM_WORLD,mpicode)
-!print *,'MARK3',mpirank,maxval(abs(temp(ra(1):rb(1),ra(2):rb(2),ra(3):rb(3),1)))
-!!!!!!!!!!!!!!!!!!!!!
-!  call synchronize_ghosts_FD (temp)
-  call synchronize_ghosts_FD_x_heat (temp(:,:,:,1))
-  if (mpidims(2)>1) then
-    call synchronize_ghosts_FD_y_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_y_serial_heat (temp(:,:,:,1))
-  endif
-  if (mpidims(1)>1) then
-    call synchronize_ghosts_FD_z_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_z_serial_heat (temp(:,:,:,1))
-  endif
-!!!!!!!!!!!!!!!!!!!!!
-!call MPI_BARRIER(MPI_COMM_WORLD,mpicode)
-!print *,'MARK4',mpirank,maxval(abs(temp(:,:,:,1)))
-!!!!!!!!!!!!!!!!!!!!!
   ! Cases if # subdomains = 1 or >=2
   if (mpiszdir>1) then 
     ! Parallel 1d solver init
@@ -178,6 +101,8 @@ subroutine heat(time,temp)
         temp(ix,iy,radir:rbdir,1) = utmpz(radir:rbdir)
       enddo 
     enddo
+    ! Synchronize ghost points
+    call synchronize_ghosts_FD_z_mpi_heat (temp(:,:,:,1))
   else
     do iy=ga(2),gb(2)
       !yy = dble(iy)*dy
@@ -191,6 +116,8 @@ subroutine heat(time,temp)
         temp(ix,iy,radir:rbdir,1) = utmpz(radir:rbdir)
       enddo
     enddo    
+    ! Synchronize ghost points
+    call synchronize_ghosts_FD_z_serial_heat (temp(:,:,:,1))
   endif
 
   ! X DIRECTION
@@ -200,27 +127,7 @@ subroutine heat(time,temp)
   rbdir = rb(1)
   gadir = ga(1)
   gbdir = gb(1)
-  ! Synchronize ghost points
-!!!!!!!!!!!!!!!!!!!!!
-!call MPI_BARRIER(MPI_COMM_WORLD,mpicode)
-!print *,'MARK5',mpirank,maxval(abs(temp(:,:,:,1)))
-!!!!!!!!!!!!!!!!!!!!!
-!  call synchronize_ghosts_FD (temp)
-  call synchronize_ghosts_FD_x_heat (temp(:,:,:,1))
-  if (mpidims(2)>1) then
-    call synchronize_ghosts_FD_y_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_y_serial_heat (temp(:,:,:,1))
-  endif
-  if (mpidims(1)>1) then
-    call synchronize_ghosts_FD_z_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_z_serial_heat (temp(:,:,:,1))
-  endif
-!!!!!!!!!!!!!!!!!!!!!
-!call MPI_BARRIER(MPI_COMM_WORLD,mpicode)
-!print *,'MARK6',mpirank,maxval(abs(temp(:,:,:,1)))
-!!!!!!!!!!!!!!!!!!!!!
+  ! Loop for all lines x=const. This is local.
   do iz=ga(3),gb(3)
     !zz = dble(iz)*dz
     do iy=ga(2),gb(2)
@@ -233,19 +140,21 @@ subroutine heat(time,temp)
       temp(radir:rbdir,iy,iz,1) = utmpx(radir:rbdir)
     enddo
   enddo    
+  ! Synchronize ghost points
+  call synchronize_ghosts_FD_x_serial_heat (temp(:,:,:,1))
 
 !!!!!!!!!!!!!!!!!!!!!
-  call synchronize_ghosts_FD_x_heat (temp(:,:,:,1))
-  if (mpidims(2)>1) then
-    call synchronize_ghosts_FD_y_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_y_serial_heat (temp(:,:,:,1))
-  endif
-  if (mpidims(1)>1) then
-    call synchronize_ghosts_FD_z_heat (temp(:,:,:,1))
-  else
-    call synchronize_ghosts_FD_z_serial_heat (temp(:,:,:,1))
-  endif
+!  call synchronize_ghosts_FD_x_heat (temp(:,:,:,1))
+!  if (mpidims(2)>1) then
+!    call synchronize_ghosts_FD_y_heat (temp(:,:,:,1))
+!  else
+!    call synchronize_ghosts_FD_y_serial_heat (temp(:,:,:,1))
+!  endif
+!  if (mpidims(1)>1) then
+!    call synchronize_ghosts_FD_z_heat (temp(:,:,:,1))
+!  else
+!    call synchronize_ghosts_FD_z_serial_heat (temp(:,:,:,1))
+!  endif
 !!!!!!!!!!!!!!!!!!!!!
 
   norminfloc = 0.0d0
@@ -324,6 +233,8 @@ subroutine heat_init(temp)
   ! Setup line communicators
   call setup_cart_groups
 
+  ! Synchronize ghost points
+  call synchronize_ghosts_FD_heat (temp(:,:,:,1))
 end subroutine heat_init
 
 subroutine solve_loc1d ( mat, rhs, x, nn )
@@ -357,32 +268,7 @@ subroutine solve_loc1d ( mat, rhs, x, nn )
   endif
   
   time_LAPACK = time_LAPACK + MPI_wtime() - t0
-end subroutine
-
-subroutine setup_cart_groups
-  use p3dfft_wrapper
-  use basic_operators
-  use vars
-  implicit none
-  integer :: mpicolor,mpikey,mpicode
-  integer :: mpicommtmp1,mpicommtmp2
-  logical :: mpiperiods(2),period,reorder
-  ! Set parameters
-  period=.true.
-  reorder=.false.
-  ! Get Cartesian topology information
-  call MPI_CART_GET(mpicommcart,2,mpidims,mpiperiods,mpicoords,mpicode)
-  ! Communicator for line in y direction
-  mpicolor = mpicoords(2) 
-  mpikey = mpicoords(1)
-  call MPI_COMM_SPLIT (mpicommcart,mpicolor,mpikey,mpicommtmp1,mpicode)
-  call MPI_CART_CREATE(mpicommtmp1,1,mpidims(1),period,reorder,mpicommz,mpicode)
-  ! Communicator for line in z direction
-  mpicolor = mpicoords(1) 
-  mpikey = mpicoords(2)
-  call MPI_COMM_SPLIT (mpicommcart,mpicolor,mpikey,mpicommtmp2,mpicode)
-  call MPI_CART_CREATE(mpicommtmp2,1,mpidims(2),period,reorder,mpicommy,mpicode)
-end subroutine
+end subroutine solve_loc1d
 
 
 ! LOD splitting. Initialization of the 1d implicit MPI solver
@@ -447,7 +333,7 @@ subroutine heat_cn_1d_mpi_init(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,
         bcmat(2*j,modulo(2*j,2*mpiszdir)+1) = vrN(j)
     enddo   
   endif
-end subroutine
+end subroutine heat_cn_1d_mpi_init
 
 
 ! LOD splitting. 1d MPI solver
@@ -497,26 +383,7 @@ subroutine heat_cn_1d_mpi_solver(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdi
   call MPI_SCATTER (bcxrs,1,MPI_DOUBLE_PRECISION,bcxr,1,MPI_DOUBLE_PRECISION,0,mpicommdir,mpicode) 
   ! Superpose local solution and BC influence
   utmp(radir:rbdir) = vf(:)-bcxl*vl(:)-bcxr*vr(:)
-
-
-!if (mpirank==0) then
-!print *,'bcxl=',bcxl
-!print *,'bcxr=',bcxr
-!print *,'vf=',vf
-!print *,'vl=',vl
-!print *,'vr=',vr
-!print *,'bcrhs=',bcrhs
-!print *,'bcx=',bcx
-!do ix=1,2*mpiszdir
-!print *, 'bcmat=', bcmaty(ix,:)
-!enddo
-!print *, 'vly',vly(:)
-!print *, 'vry',vry(:)
-!call abort()
-!endif
-
-
-end subroutine
+end subroutine heat_cn_1d_mpi_solver
 
 
 ! LOD splitting. 1d serial solver
@@ -549,144 +416,5 @@ subroutine heat_cn_1d_serial_solver(h2inv,radir,rbdir,gadir,gbdir,dt,utmp)
   rhs(:) = utmp(radir:rbdir)+0.5d0*dt*nu*(utmp((radir-1):(rbdir-1))-2.d0*utmp(radir:rbdir)+utmp((radir+1):(rbdir+1)))*h2inv
   ! Solve local system
   call solve_loc1d (cnmat,rhs,utmp(radir:rbdir),rbdir-radir+1)
-end subroutine
-
-
-! Ghost point synchronization in z
-subroutine synchronize_ghosts_FD_z_heat(fld)
-  use p3dfft_wrapper
-  use basic_operators
-  use vars
-  implicit none
-  ! Input/output
-  real(kind=pr),intent(inout)::fld(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3))
-  ! Local variables
-  integer :: statu(MPI_STATUS_SIZE),nnl,nnr,disp,dir,source,dest,mpicode
-  real(kind=pr) :: fld_send_l(ga(1):gb(1),ga(2):gb(2),ra(3):(2*ra(3)-ga(3)-1)),&
-                   fld_send_r(ga(1):gb(1),ga(2):gb(2),(2*rb(3)-gb(3)+1):rb(3))
-  real(kind=pr) :: fld_recv_l(ga(1):gb(1),ga(2):gb(2),ga(3):(ra(3)-1)),&
-                   fld_recv_r(ga(1):gb(1),ga(2):gb(2),(rb(3)+1):gb(3))
-  ! Size of buffer arrays
-  nnl = (ra(3)-ga(3))*(gb(2)-ga(2)+1)*(gb(1)-ga(1)+1)
-  nnr = (gb(3)-rb(3))*(gb(2)-ga(2)+1)*(gb(1)-ga(1)+1)
-  ! Copy data to buffer arrays
-  fld_send_l(:,:,:) = fld(ga(1):gb(1),ga(2):gb(2),ra(3):(2*ra(3)-ga(3)-1))
-  fld_send_r(:,:,:) = fld(ga(1):gb(1),ga(2):gb(2),(2*rb(3)-gb(3)+1):rb(3))
-  ! Find rank of neighbors on the right
-  disp=1                 !immediate neighbors
-  dir=0
-  call MPI_CART_SHIFT(mpicommz,dir,disp,source,dest,mpicode)
-  ! Send data to the neighbors on the right
-  call MPI_SENDRECV(fld_send_r,nnr,MPI_DOUBLE_PRECISION,dest,0,&
-                    fld_recv_l,nnr,MPI_DOUBLE_PRECISION,source,0,&
-                    mpicommz,statu,mpicode)
-  ! Find rank of neighbors on the left
-  disp=-1                !immediate neighbors
-  dir=0
-  call MPI_CART_SHIFT(mpicommz,dir,disp,source,dest,mpicode)
-  ! Send data to the neighbors on the left
-  call MPI_SENDRECV(fld_send_l,nnl,MPI_DOUBLE_PRECISION,dest,0,&
-                    fld_recv_r,nnl,MPI_DOUBLE_PRECISION,source,0,&
-                    mpicommz,statu,mpicode)
-  ! Copy data to output array
-  fld(ga(1):gb(1),ga(2):gb(2),ga(3):(ra(3)-1)) = fld_recv_l(:,:,:)
-  fld(ga(1):gb(1),ga(2):gb(2),(rb(3)+1):gb(3)) = fld_recv_r(:,:,:)
-end subroutine
-
-
-! Ghost point synchronization in y
-subroutine synchronize_ghosts_FD_y_heat(fld)
-  use p3dfft_wrapper
-  use basic_operators
-  use vars
-  implicit none
-  ! Input/output
-  real(kind=pr),intent(inout)::fld(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3))
-  ! Local variables
-  integer :: statu(MPI_STATUS_SIZE),nnl,nnr,disp,dir,source,dest,mpicode
-  real(kind=pr) :: fld_send_l(ga(1):gb(1),ra(2):(2*ra(2)-ga(2)-1),ga(3):gb(3)),&
-                   fld_send_r(ga(1):gb(1),(2*rb(2)-gb(2)+1):rb(2),ga(3):gb(3))
-  real(kind=pr) :: fld_recv_l(ga(1):gb(1),ga(2):(ra(2)-1),ga(3):gb(3)),&
-                   fld_recv_r(ga(1):gb(1),(rb(2)+1):gb(2),ga(3):gb(3))
-  ! Size of buffer arrays
-  nnl = (ra(2)-ga(2))*(gb(3)-ga(3)+1)*(gb(1)-ga(1)+1)
-  nnr = (gb(2)-rb(2))*(gb(3)-ga(3)+1)*(gb(1)-ga(1)+1)
-!print *,mpirank,nnl,nnr,size(fld_send_l),size(fld_send_r),size(fld_recv_l),size(fld_recv_r)
-  ! Copy data to buffer arrays
-  fld_send_l(:,:,:) = fld(ga(1):gb(1),ra(2):(2*ra(2)-ga(2)-1),ga(3):gb(3))
-  fld_send_r(:,:,:) = fld(ga(1):gb(1),(2*rb(2)-gb(2)+1):rb(2),ga(3):gb(3))
-
-  ! Find rank of neighbors on the right
-  disp=1                 !immediate neighbors
-  dir=0
-  call MPI_CART_SHIFT(mpicommy,dir,disp,source,dest,mpicode)
-  ! Send data to the neighbors on the right
-  call MPI_SENDRECV(fld_send_r,nnr,MPI_DOUBLE_PRECISION,dest,0,&
-                    fld_recv_l,nnr,MPI_DOUBLE_PRECISION,source,0,&
-                    mpicommy,statu,mpicode)
-  ! Find rank of neighbors on the left
-  disp=-1                !immediate neighbors
-  dir=0
-  call MPI_CART_SHIFT(mpicommy,dir,disp,source,dest,mpicode)
-  ! Send data to the neighbors on the left
-  call MPI_SENDRECV(fld_send_l,nnl,MPI_DOUBLE_PRECISION,dest,0,&
-                    fld_recv_r,nnl,MPI_DOUBLE_PRECISION,source,0,&
-                    mpicommy,statu,mpicode)
-  ! Copy data to output array
-  fld(ga(1):gb(1),ga(2):(ra(2)-1),ga(3):gb(3)) = fld_recv_l(:,:,:)
-  fld(ga(1):gb(1),(rb(2)+1):gb(2),ga(3):gb(3)) = fld_recv_r(:,:,:)
-end subroutine
-
-
-! Ghost point synchronization in x
-subroutine synchronize_ghosts_FD_x_heat(fld)
-  use p3dfft_wrapper
-  use basic_operators
-  use vars
-  implicit none
-  ! Input/output
-  real(kind=pr),intent(inout)::fld(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3))
-  ! Copy data to ghost points. X direction is local
-  fld((rb(1)+1):gb(1),ga(2):gb(2),ga(3):gb(3)) = fld(ra(1):(2*ra(1)-ga(1)-1),ga(2):gb(2),ga(3):gb(3))
-  fld(ga(1):(ra(1)-1),ga(2):gb(2),ga(3):gb(3)) = fld((2*rb(1)-gb(1)+1):rb(1),ga(2):gb(2),ga(3):gb(3))
-end subroutine
-
-
-! Ghost point synchronization in y on one process
-subroutine synchronize_ghosts_FD_y_serial_heat(fld)
-  use p3dfft_wrapper
-  use basic_operators
-  use vars
-  implicit none
-  ! Input/output
-  real(kind=pr),intent(inout)::fld(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3))
-  ! Copy data to ghost points. Y direction is local in this case
-  fld(ga(1):gb(1),(rb(2)+1):gb(2),ga(3):gb(3)) = fld(ga(1):gb(1),ra(2):(2*ra(2)-ga(2)-1),ga(3):gb(3))
-  fld(ga(1):gb(1),ga(2):(ra(2)-1),ga(3):gb(3)) = fld(ga(1):gb(1),(2*rb(2)-gb(2)+1):rb(2),ga(3):gb(3))
-end subroutine
-
-
-! Ghost point synchronization in z on one process
-subroutine synchronize_ghosts_FD_z_serial_heat(fld)
-  use p3dfft_wrapper
-  use basic_operators
-  use vars
-  implicit none
-  ! Input/output
-  real(kind=pr),intent(inout)::fld(ga(1):gb(1),ga(2):gb(2),ga(3):gb(3))
-  ! Copy data to ghost points. Z direction is local in this case
-  fld(ga(1):gb(1),ga(2):gb(2),(rb(3)+1):gb(3)) = fld(ga(1):gb(1),ga(2):gb(2),ra(3):(2*ra(3)-ga(3)-1))
-  fld(ga(1):gb(1),ga(2):gb(2),ga(3):(ra(3)-1)) = fld(ga(1):gb(1),ga(2):gb(2),(2*rb(3)-gb(3)+1):rb(3))
-end subroutine
-
-
-
-
-
-
-
-
-
-
-
+end subroutine heat_cn_1d_serial_solver
 
