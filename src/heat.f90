@@ -10,6 +10,8 @@ subroutine heat(time,temp)
   ! Local variables
   integer :: ix,iy,iz,mpicommdir,mpiszdir,radir,rbdir,gadir,gbdir,mpirankdir,&
              mpicode
+  integer :: bcipivy(2*mpidims(2)),cnipivy(ga(2):gb(2)),&
+             bcipivz(2*mpidims(1)),cnipivz(ga(3):gb(3))
   real(kind=pr) :: xx,yy,zz,t1,norminf1,norminfloc1,norminf2,&
                    norminfloc2,norminf,norminfloc,&
                    tempdxdx,tempdydy,tempdzdz,dx2inv,dy2inv,dz2inv,h2inv,dt
@@ -40,7 +42,7 @@ subroutine heat(time,temp)
   if (mpiszdir>1) then 
     ! Parallel 1d solver init
     call heat_cn_1d_mpi_init (mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,dt,&
-                              bcmaty,cnmaty,vly,vry)
+                              bcmaty,cnmaty,bcipivy,cnipivy,vly,vry)
     ! Loop for all lines y=const
     do iz = ga(3),gb(3)
       !zz = dble(iz)*dz
@@ -50,7 +52,7 @@ subroutine heat(time,temp)
         utmpy(:) = temp(ix,gadir:gbdir,iz,1)
         ! Solve linear system
         call heat_cn_1d_mpi_solver (mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,gadir,gbdir,dt,&
-                                    bcmaty,cnmaty,vly,vry,utmpy)
+                                    bcmaty,cnmaty,bcipivy,cnipivy,vly,vry,utmpy)
         ! Vector returned
         temp(ix,radir:rbdir,iz,1) = utmpy(radir:rbdir)
       enddo 
@@ -87,7 +89,7 @@ subroutine heat(time,temp)
   if (mpiszdir>1) then 
     ! Parallel 1d solver init
     call heat_cn_1d_mpi_init (mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,dt,&
-                              bcmatz,cnmatz,vlz,vrz)
+                              bcmatz,cnmatz,bcipivz,cnipivz,vlz,vrz)
     ! Loop for all lines y=const
     do iy=ga(2),gb(2)
       !yy = dble(iy)*dy
@@ -96,7 +98,7 @@ subroutine heat(time,temp)
         ! Vector to be processed
         utmpz(:) = temp(ix,iy,gadir:gbdir,1)
         call heat_cn_1d_mpi_solver (mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,gadir,gbdir,dt,&
-                                    bcmatz,cnmatz,vlz,vrz,utmpz)
+                                    bcmatz,cnmatz,bcipivz,cnipivz,vlz,vrz,utmpz)
         ! Vector returned
         temp(ix,iy,radir:rbdir,1) = utmpz(radir:rbdir)
       enddo 
@@ -143,20 +145,7 @@ subroutine heat(time,temp)
   ! Synchronize ghost points
   call synchronize_ghosts_FD_x_serial_heat (temp(:,:,:,1))
 
-!!!!!!!!!!!!!!!!!!!!!
-!  call synchronize_ghosts_FD_x_heat (temp(:,:,:,1))
-!  if (mpidims(2)>1) then
-!    call synchronize_ghosts_FD_y_heat (temp(:,:,:,1))
-!  else
-!    call synchronize_ghosts_FD_y_serial_heat (temp(:,:,:,1))
-!  endif
-!  if (mpidims(1)>1) then
-!    call synchronize_ghosts_FD_z_heat (temp(:,:,:,1))
-!  else
-!    call synchronize_ghosts_FD_z_serial_heat (temp(:,:,:,1))
-!  endif
-!!!!!!!!!!!!!!!!!!!!!
-
+  ! Compute error norm
   norminfloc = 0.0d0
   norminfloc1 = 0.0d0
   norminfloc2 = 0.0d0
@@ -237,49 +226,65 @@ subroutine heat_init(temp)
   call synchronize_ghosts_FD_heat (temp(:,:,:,1))
 end subroutine heat_init
 
-subroutine solve_loc1d ( mat, rhs, x, nn )
+subroutine factorize_loc1d(mat,ipiv,nn)
   !--------------------------------------------
-  ! solves the linear system J*x = F
+  ! solves the linear system mat*x=rhs
+  ! nn equations, sqare full matrix
   !--------------------------------------------
   use vars
   implicit none
-  integer, intent(in) :: nn
-  real(kind=pr),dimension(1:nn,1:nn), intent(in) :: mat
-  real(kind=pr),dimension(1:nn), intent(out) :: x
-  real(kind=pr),dimension(1:nn), intent(in) :: rhs
-  real(kind=pr),dimension(1:nn,1:nn) :: mat2
+  integer,intent(in) :: nn
+  integer,intent(inout) :: ipiv(1:nn)
+  real(kind=pr),intent(inout) :: mat(1:nn,1:nn)
   real(kind=pr) :: t0
-  integer :: error,ipiv(1:nn)  
+  integer :: error
+
   t0 = MPI_wtime()
-  
-  !mat2 = transpose(mat)
-  mat2 = mat
-  call dgetrf (nn,nn,mat2,nn,ipiv,error)
+  call dgetrf (nn,nn,mat,nn,ipiv,error)
   if (error .ne. 0) then
     write(*,*) "!!! Crutial: dgetrf error.", error
     call abort()
   endif
-  
+  time_LAPACK = time_LAPACK + MPI_wtime() - t0
+end subroutine factorize_loc1d
+
+! Solve linear system with a full matrix, factorized
+subroutine solve_loc1d (mat,ipiv,rhs,x,nn)
+  !--------------------------------------------
+  ! solves the linear system mat*x=rhs
+  ! nn equations, sqare full matrix
+  ! mat contains the LDU factorization
+  !--------------------------------------------
+  use vars
+  implicit none
+  integer,intent(in) :: nn
+  integer,intent(inout) :: ipiv(1:nn)
+  real(kind=pr),intent(inout) :: mat(1:nn,1:nn)
+  real(kind=pr),intent(inout) :: x(1:nn)
+  real(kind=pr),intent(inout) :: rhs(1:nn)
+  real(kind=pr) :: t0
+  integer :: error 
+
+  t0 = MPI_wtime()
   x = rhs
-  call dgetrs ('N',nn,1,mat2,nn,ipiv,x,nn,error)
+  call dgetrs ('N',nn,1,mat,nn,ipiv,x,nn,error)
   if (error .ne. 0) then 
     write(*,*) "!!! Crutial: dgetrs error.", error
     call abort()
   endif
-  
   time_LAPACK = time_LAPACK + MPI_wtime() - t0
 end subroutine solve_loc1d
 
-
 ! LOD splitting. Initialization of the 1d implicit MPI solver
 subroutine heat_cn_1d_mpi_init(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,dt,&
-                           bcmat,cnmat,vl,vr)
+                           bcmat,cnmat,bcipiv,cnipiv,vl,vr)
   use p3dfft_wrapper
   use basic_operators
   use vars
   implicit none
   ! Input/output
   integer,intent(inout) :: mpicommdir,mpiszdir,mpirankdir,radir,rbdir
+  integer,intent(inout) :: bcipiv(2*mpiszdir),cnipiv(radir:rbdir)
   real(kind=pr),intent(inout) :: h2inv,dt
   real(kind=pr),intent(inout) :: cnmat(radir:rbdir,radir:rbdir),bcmat(2*mpiszdir,2*mpiszdir),&
                                  vl(radir:rbdir),vr(radir:rbdir)
@@ -299,16 +304,18 @@ subroutine heat_cn_1d_mpi_init(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,
     cnmat(j,j+1) = - 0.5d0*dt*nu*h2inv
     cnmat(j+1,j) = - 0.5d0*dt*nu*h2inv
   enddo
+  ! Factorize the CN matrix
+  nn = rbdir-radir+1
+  call factorize_loc1d (cnmat,cnipiv,nn)
   ! Boundary conditions for domain decomposition
   ! BC influence basis
-  nn = rbdir-radir+1
   rhs(:) = 0.d0
   rhs(radir) = 1.d0
-  call solve_loc1d (cnmat,rhs,vl,nn)
+  call solve_loc1d (cnmat,cnipiv,rhs,vl,nn)
   vl(:) = (-0.5d0*dt*nu*h2inv)*vl(:)
   rhs(rbdir) = 1.d0
   rhs(radir) = 0.d0
-  call solve_loc1d (cnmat,rhs,vr,nn)
+  call solve_loc1d (cnmat,cnipiv,rhs,vr,nn)
   vr(:) = (-0.5d0*dt*nu*h2inv)*vr(:)
   ! BC influence matrix
   ! It is only stored by one process
@@ -335,19 +342,22 @@ subroutine heat_cn_1d_mpi_init(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,
         bcmat(2*j,modulo(2*j-3,2*mpiszdir)+1) = vlN(j)
         bcmat(2*j,modulo(2*j,2*mpiszdir)+1) = vrN(j)
     enddo   
+    ! Factorize the BC influence matrix
+    call factorize_loc1d (bcmat,bcipiv,2*mpiszdir)
   endif
 end subroutine heat_cn_1d_mpi_init
 
 
 ! LOD splitting. 1d MPI solver
 subroutine heat_cn_1d_mpi_solver(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdir,gadir,gbdir,dt,&
-                             bcmat,cnmat,vl,vr,utmp)
+                             bcmat,cnmat,bcipiv,cnipiv,vl,vr,utmp)
   use p3dfft_wrapper
   use basic_operators
   use vars
   implicit none
   ! Input/output
   integer,intent(inout) :: mpicommdir,mpiszdir,mpirankdir,radir,rbdir,gadir,gbdir
+  integer,intent(inout) :: bcipiv(2*mpiszdir),cnipiv(radir:rbdir)
   real(kind=pr),intent(inout) :: h2inv,dt
   real(kind=pr),intent(inout) :: cnmat(radir:rbdir,radir:rbdir),bcmat(2*mpiszdir,2*mpiszdir),&
                                  vl(radir:rbdir),vr(radir:rbdir),utmp(gadir:gbdir)
@@ -361,7 +371,7 @@ subroutine heat_cn_1d_mpi_solver(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdi
   ! Crank-Nicolson explicit part
   rhs(:) = utmp(radir:rbdir)+0.5d0*dt*nu*(utmp((radir-1):(rbdir-1))-2.d0*utmp(radir:rbdir)+utmp((radir+1):(rbdir+1)))*h2inv
   ! Solve local system
-  call solve_loc1d (cnmat,rhs,vf,rbdir-radir+1)
+  call solve_loc1d (cnmat,cnipiv,rhs,vf,rbdir-radir+1)
   ! Communicate rhs to rank 0 in the line
   shortfoo(1) = vf(radir)
   shortfoo(2) = vf(rbdir)
@@ -377,7 +387,7 @@ subroutine heat_cn_1d_mpi_solver(mpicommdir,mpiszdir,mpirankdir,h2inv,radir,rbdi
       bcrhs(2*j) = vfN(j)
     enddo
     ! Solve BC influence system
-    call solve_loc1d (bcmat,bcrhs,bcx,2*mpiszdir)
+    call solve_loc1d (bcmat,bcipiv,bcrhs,bcx,2*mpiszdir)
     ! Rearrange for mpi scatter
     do j = 1,mpiszdir
       bcxls(j) = bcx(modulo(2*j-3,2*mpiszdir)+1)
@@ -408,7 +418,7 @@ subroutine heat_cn_1d_serial_solver(h2inv,radir,rbdir,gadir,gbdir,dt,utmp)
   real(kind=pr),intent(inout) :: h2inv,dt
   real(kind=pr),intent(inout) :: utmp(gadir:gbdir)
   ! local variables
-  integer :: j
+  integer :: j,cnipiv(radir:rbdir)
   real(kind=pr) :: cnmat(radir:rbdir,radir:rbdir),rhs(radir:rbdir)
 
   ! Crank-Nicolson matrix in x direction
@@ -425,7 +435,9 @@ subroutine heat_cn_1d_serial_solver(h2inv,radir,rbdir,gadir,gbdir,dt,utmp)
   cnmat(rbdir,radir) = - 0.5d0*dt*nu*h2inv
   ! Crank-Nicolson explicit part
   rhs(:) = utmp(radir:rbdir)+0.5d0*dt*nu*(utmp((radir-1):(rbdir-1))-2.d0*utmp(radir:rbdir)+utmp((radir+1):(rbdir+1)))*h2inv
+  ! Factorize CN matrix
+  call factorize_loc1d (cnmat,cnipiv,rbdir-radir+1)
   ! Solve local system
-  call solve_loc1d (cnmat,rhs,utmp(radir:rbdir),rbdir-radir+1)
+  call solve_loc1d (cnmat,cnipiv,rhs,utmp(radir:rbdir),rbdir-radir+1)
 end subroutine heat_cn_1d_serial_solver
 
